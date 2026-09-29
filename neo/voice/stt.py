@@ -15,9 +15,10 @@ class SpeechListener:
         self,
         model_path: Path,
         device_index: int = -1,
+        sample_rate: int = 16000,
         max_seconds: float = 8.0,
         silence_seconds: float = 1.1,
-        blocksize: int = 4000,
+        blocksize: int = 2000,
     ) -> None:
         try:
             from vosk import KaldiRecognizer, Model, SetLogLevel
@@ -28,9 +29,7 @@ class SpeechListener:
             ) from exc
 
         if not model_path.exists():
-            raise FileNotFoundError(
-                f"Vosk model not found: {model_path}"
-            )
+            raise FileNotFoundError(f"Vosk model not found: {model_path}")
 
         self._Model = Model
         self._KaldiRecognizer = KaldiRecognizer
@@ -38,19 +37,16 @@ class SpeechListener:
 
         self.model = self._Model(str(model_path))
         self.device_index = None if device_index < 0 else device_index
-        self.sample_rate = int(
-            sd.query_devices(self.device_index, "input")["default_samplerate"]
-        )
+        self.sample_rate = sample_rate
         self.max_seconds = max_seconds
         self.silence_seconds = silence_seconds
         self.blocksize = blocksize
-        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=20)
+        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=30)
 
     def _callback(self, indata, frames, callback_time, status) -> None:
         del frames, callback_time
         if status:
             pass
-
         try:
             self._queue.put_nowait(bytes(indata))
         except queue.Full:
@@ -82,15 +78,11 @@ class SpeechListener:
                 except queue.Empty:
                     continue
 
-                # Vosk's endpointing is the primary signal. The timeout gives
-                # the user a natural pause after a short command.
                 if recognizer.AcceptWaveform(data):
                     result = json.loads(recognizer.Result())
                     text = result.get("text", "").strip()
                     if text:
                         return text
-                    if heard_speech and time.monotonic() - last_speech >= self.silence_seconds:
-                        break
 
                 partial = json.loads(recognizer.PartialResult())
                 partial_text = partial.get("partial", "").strip()
