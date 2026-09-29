@@ -13,7 +13,7 @@ Neo is a personal AI assistant for the laptop.
 
 ## Voice mode
 
-Neo now uses a completely local/free voice stack. There is no Picovoice account, AccessKey, or paid wake-word service.
+Neo uses a completely local/free voice stack. There is no Picovoice account, AccessKey, or paid wake-word service.
 
 The flow is:
 
@@ -25,21 +25,19 @@ The flow is:
 6. Neo sends it through the approved tool router.
 7. Neo speaks the result using the Windows-installed female TTS voice when one is available.
 
-Vosk is an offline speech-recognition toolkit. The official model list includes the 36 MB Indian-English model vosk-model-small-en-in-0.4, which is intended for lightweight use.
-
 ### Install on Windows
 
     python -m pip install -r requirements.txt
 
 ### Download the voice model
 
-Download:
+For the current V1 setup, use the model:
 
-    vosk-model-small-en-in-0.4
+    vosk-model-small-en-us-0.15
 
 Extract it so this folder exists:
 
-    models/vosk-model-small-en-in-0.4/
+    models/vosk-model-small-en-us-0.15/
 
 The model is not committed to GitHub.
 
@@ -51,22 +49,11 @@ To choose a specific installed voice:
 
     $env:NEO_TTS_VOICE="Zira"
 
-You can change speaking speed and volume with:
-
-    $env:NEO_TTS_RATE="175"
-    $env:NEO_TTS_VOLUME="1.0"
-
 ### Microphone
 
 Neo uses the Windows default microphone by default.
 
-To select another input device:
-
-    $env:NEO_AUDIO_DEVICE="2"
-
-Use -1 for the Windows default input device.
-
-### Start voice mode
+To start voice mode:
 
     python main.py --voice
 
@@ -91,32 +78,15 @@ Neo will transcribe the command, execute the approved action, and speak the resu
 
 ### Wake-word note
 
-This free implementation uses offline speech recognition as the wake-word detector rather than a dedicated keyword-spotting engine. It therefore uses more CPU than a specialized wake-word detector and can occasionally misrecognize similar-sounding speech. The advantage is that the entire wake process stays local and requires no paid service or cloud account.
+This free implementation uses offline speech recognition as the wake-word detector rather than a dedicated keyword-spotting engine. It uses more CPU than a specialized wake-word detector and may occasionally misrecognize similar-sounding speech. The advantage is that the wake process stays local and requires no paid service or cloud account.
 
 ## Text mode
 
     python main.py
 
-Deterministic commands:
-
-    help
-    status
-    open vscode
-    open calculator
-    open browser
-    search python decorators
-    remember editor = VS Code
-    recall editor
-    exit
-
 ## Local brain
 
 Neo can optionally use an Ollama-compatible local API for natural-language fallback.
-
-Set:
-
-    llm_enabled = true
-    ollama_model = your-installed-model
 
 Neo does not execute arbitrary shell commands in V1. Future versions will add structured tool calling so the local model can select approved tools safely.
 
