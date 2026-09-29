@@ -4,7 +4,16 @@ from dataclasses import dataclass
 
 from .core.brain import LocalBrain
 from .memory import Memory
-from .tools.system import laptop_status, open_application, open_url, web_search
+from .tools.system import (
+    create_folder,
+    laptop_status,
+    lock_laptop,
+    network_status,
+    open_application,
+    open_folder,
+    open_url,
+    web_search,
+)
 
 @dataclass(frozen=True)
 class CommandResult:
@@ -28,17 +37,56 @@ class CommandRouter:
         if lowered in {"exit", "quit", "shutdown neo", "goodbye"}:
             return CommandResult("Shutting down. See you soon, Neal.", True)
 
-        if lowered in {"help", "commands"}:
+        if lowered in {"help", "commands", "what can you do", "what can you do?"}:
             return CommandResult(
-                "Commands: help | status | open <app> | url <address> | "
-                "search <query> | remember <key> = <value> | recall <key> | exit"
+                "I can open apps and websites, open Desktop/Downloads/Documents/"
+                "Pictures/Music/Videos, search Google, create a folder on an "
+                "approved standard folder, report laptop/network status, remember "
+                "information, and lock the Windows laptop."
             )
 
-        if lowered == "status":
+        if lowered in {"status", "laptop status", "system status"}:
             return CommandResult(laptop_status())
 
+        if lowered in {"network", "network status", "my ip", "ip address"}:
+            return CommandResult(network_status())
+
+        if lowered in {
+            "lock laptop",
+            "lock my laptop",
+            "lock computer",
+            "lock my computer",
+        }:
+            return CommandResult(lock_laptop())
+
+        if lowered.startswith("open folder "):
+            return CommandResult(open_folder(command[12:]))
+
+        if lowered.startswith("open my "):
+            target = command[8:].strip().lower()
+            if target in {"desktop", "downloads", "documents", "pictures", "music", "videos"}:
+                return CommandResult(open_folder(target))
+
         if lowered.startswith("open "):
-            return CommandResult(open_application(command[5:]))
+            target = command[5:].strip()
+            folder_key = target.lower()
+            if folder_key in {"desktop", "downloads", "documents", "pictures", "music", "videos"}:
+                return CommandResult(open_folder(folder_key))
+            return CommandResult(open_application(target))
+
+        if lowered.startswith("create folder "):
+            payload = command[14:].strip()
+            location = "desktop"
+
+            marker = " in "
+            if marker in payload.lower():
+                split_index = payload.lower().rfind(marker)
+                name = payload[:split_index].strip()
+                location = payload[split_index + len(marker):].strip()
+            else:
+                name = payload
+
+            return CommandResult(create_folder(name, location))
 
         if lowered.startswith("url "):
             return CommandResult(open_url(command[4:]))
