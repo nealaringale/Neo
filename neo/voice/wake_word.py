@@ -1,72 +1,110 @@
 from __future__ import annotations
 
-import os
+import json
+import queue
+import time
 from pathlib import Path
+
+import sounddevice as sd
 
 
 class WakeWordDetector:
-    """Always-on local wake-word detector using a custom Porcupine model."""
+    """Offline wake-word detector using Vosk with a fixed 'neo' grammar.
+
+    The microphone is processed locally. Neo only becomes active when the
+    recognizer returns the word 'neo'. No cloud API or access key is needed.
+    """
 
     def __init__(
         self,
-        keyword_path: Path,
-        access_key: str | None = None,
+        model_path: Path,
         device_index: int = -1,
-        sensitivity: float = 0.55,
+        sample_rate: int | None = None,
+        blocksize: int = 4000,
     ) -> None:
         try:
-            import pvporcupine
-            from pvrecorder import PvRecorder
+            from vosk import KaldiRecognizer, Model, SetLogLevel
         except ImportError as exc:
             raise RuntimeError(
                 "Voice dependencies are missing. Run: "
                 "python -m pip install -r requirements.txt"
             ) from exc
 
-        access_key = access_key or os.getenv("PICOVOICE_ACCESS_KEY")
-        if not access_key:
-            raise RuntimeError(
-                "PICOVOICE_ACCESS_KEY is missing. Create a Picovoice account, "
-                "copy your AccessKey, and store it in the environment."
-            )
-
-        if not keyword_path.exists():
+        if not model_path.exists():
             raise FileNotFoundError(
-                f"Wake-word model not found: {keyword_path}\n"
-                "Create a custom 'Neo' keyword model for Windows and place the "
-                "downloaded .ppn file at this path."
+                f"Vosk model not found: {model_path}\n"
+                "Download the Vosk Indian-English model and extract it there."
             )
 
-        self._porcupine = pvporcupine.create(
-            access_key=access_key,
-            keyword_paths=[str(keyword_path)],
-            sensitivities=[sensitivity],
-        )
-        self._recorder = PvRecorder(
-            frame_length=self._porcupine.frame_length,
-            device_index=device_index,
-        )
-        self._triggered = False
+        self._Model = Model
+        self._KaldiRecognizer = KaldiRecognizer
+        SetLogLevel(-1)
 
-    def wait(self) -> None:
-        """Block until the custom 'Neo' keyword is detected."""
-        self._recorder.start()
+        self.model = self._Model(str(model_path))
+        self.device_index = None if device_index < 0 else device_index
+        self.sample_rate = sample_rate or int(
+            sd.query_devices(self.device_index, "input")["default_samplerate"]
+        )
+        self.blocksize = blocksize
+        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=20)
+
+    def _callback(self, indata, frames, callback_time, status) -> None:
+        del frames, callback_time
+        if status:
+            # Do not print normal audio-device warnings repeatedly.
+            pass
+
         try:
+            self._queue.put_nowait(bytes(indata))
+        except queue.Full:
+            # Drop stale audio rather than allowing the wake detector to lag.
+            pass
+
+    @staticmethod
+    def _contains_wake_word(result: str) -> bool:
+        try:
+            text = json.loads(result).get("text", "").strip().lower()
+        except json.JSONDecodeError:
+            return False
+
+        words = text.split()
+        return "neo" in words
+
+    def wait(self, timeout: float | None = None) -> bool:
+        """Wait until 'neo' is heard. Returns False if timeout expires."""
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+
+        recognizer = self._KaldiRecognizer(
+            self.model,
+            self.sample_rate,
+            json.dumps(["neo"]),
+        )
+
+        started = time.monotonic()
+
+        with sd.RawInputStream(
+            samplerate=self.sample_rate,
+            blocksize=self.blocksize,
+            device=self.device_index,
+            dtype="int16",
+            channels=1,
+            callback=self._callback,
+        ):
             while True:
-                frame = self._recorder.read()
-                if self._porcupine.process(frame) >= 0:
-                    self._triggered = True
-                    return
-        finally:
-            self._recorder.stop()
+                if timeout is not None and time.monotonic() - started >= timeout:
+                    return False
 
-    @property
-    def recorder(self):
-        """Expose the recorder so STT can continue using the same device."""
-        return self._recorder
+                try:
+                    data = self._queue.get(timeout=0.5)
+                except queue.Empty:
+                    continue
 
-    def close(self) -> None:
-        try:
-            self._recorder.delete()
-        finally:
-            self._porcupine.delete()
+                if recognizer.AcceptWaveform(data):
+                    if self._contains_wake_word(recognizer.Result()):
+                        return True
+                elif self._contains_wake_word(recognizer.PartialResult()):
+                    return True
