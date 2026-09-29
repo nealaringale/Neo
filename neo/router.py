@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .core.brain import LocalBrain
 from .memory import Memory
 from .tools.system import laptop_status, open_application, open_url, web_search
 
@@ -11,10 +12,11 @@ class CommandResult:
     should_exit: bool = False
 
 class CommandRouter:
-    """Deterministic command router for Neo V1."""
+    """Deterministic tool router with optional natural-language fallback."""
 
-    def __init__(self, memory: Memory) -> None:
+    def __init__(self, memory: Memory, brain: LocalBrain | None = None) -> None:
         self.memory = memory
+        self.brain = brain
 
     def route(self, raw_command: str) -> CommandResult:
         command = raw_command.strip()
@@ -60,6 +62,11 @@ class CommandRouter:
             if value is None:
                 return CommandResult(f"I do not remember anything for {key}.")
             return CommandResult(f"{key}: {value}")
+
+        if self.brain is not None:
+            response = self.brain.ask(command)
+            if response:
+                return CommandResult(response)
 
         return CommandResult(
             "I do not know that command yet. Type help to see Neo V1 commands."
