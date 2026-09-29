@@ -18,11 +18,12 @@ class Settings:
     llm_enabled: bool = False
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "llama3.2"
-    wake_word_path: str = "models/neo_windows.ppn"
+
     vosk_model_path: str = "models/vosk-model-small-en-in-0.4"
     audio_device_index: int = -1
-    wake_sensitivity: float = 0.55
+    audio_blocksize: int = 4000
     command_max_seconds: float = 8.0
+    command_silence_seconds: float = 1.1
     tts_voice: str = ""
     tts_rate: int = 175
     tts_volume: float = 1.0
@@ -49,11 +50,11 @@ def load_settings() -> Settings:
         llm_enabled=llm_enabled,
         ollama_url=os.getenv("OLLAMA_URL", data.get("ollama_url", "http://127.0.0.1:11434")),
         ollama_model=os.getenv("OLLAMA_MODEL", data.get("ollama_model", "llama3.2")),
-        wake_word_path=os.getenv("NEO_WAKE_WORD_PATH", data.get("wake_word_path", "models/neo_windows.ppn")),
         vosk_model_path=os.getenv("NEO_VOSK_MODEL_PATH", data.get("vosk_model_path", "models/vosk-model-small-en-in-0.4")),
         audio_device_index=int(os.getenv("NEO_AUDIO_DEVICE", data.get("audio_device_index", -1))),
-        wake_sensitivity=float(os.getenv("NEO_WAKE_SENSITIVITY", data.get("wake_sensitivity", 0.55))),
+        audio_blocksize=int(os.getenv("NEO_AUDIO_BLOCKSIZE", data.get("audio_blocksize", 4000))),
         command_max_seconds=float(os.getenv("NEO_COMMAND_MAX_SECONDS", data.get("command_max_seconds", 8.0))),
+        command_silence_seconds=float(os.getenv("NEO_COMMAND_SILENCE_SECONDS", data.get("command_silence_seconds", 1.1))),
         tts_voice=os.getenv("NEO_TTS_VOICE", data.get("tts_voice", "")),
         tts_rate=int(os.getenv("NEO_TTS_RATE", data.get("tts_rate", 175))),
         tts_volume=float(os.getenv("NEO_TTS_VOLUME", data.get("tts_volume", 1.0))),
