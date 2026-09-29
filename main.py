@@ -9,7 +9,7 @@ try:
     from neo.core.assistant import NeoAssistant
     PACKAGE_NAME = "neo"
 except ModuleNotFoundError as exc:
-    if exc.name != "neo.config":
+    if not (exc.name == "neo" or (exc.name and exc.name.startswith("neo."))):
         raise
     from Neo.config import load_settings
     from Neo.core.assistant import NeoAssistant
