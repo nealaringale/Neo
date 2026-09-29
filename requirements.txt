@@ -1,1 +1,5 @@
-# Neo V1 uses Python standard library only.
+# Voice dependencies
+pvporcupine>=3.0,<4
+pvrecorder>=1.2,<2
+vosk>=0.3.45,<0.4
+pyttsx3>=2.98,<3
