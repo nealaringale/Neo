@@ -1,5 +1,4 @@
-# Voice dependencies
-pvporcupine>=3.0,<4
-pvrecorder>=1.2,<2
+# Free offline voice stack
 vosk>=0.3.45,<0.4
+sounddevice>=0.5,<0.6
 pyttsx3>=2.98,<3
