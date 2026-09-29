@@ -32,12 +32,13 @@ def microphone_test(model_path: Path, device_index: int = -1, seconds: float = 6
 
     device = None if device_index < 0 else device_index
     info = sd.query_devices(device, "input")
-    sample_rate = int(info["default_samplerate"])
+    sample_rate = 16000
 
     print(f"\nMicrophone: {info['name']}")
-    print(f"Sample rate: {sample_rate}")
+    print(f"Device native rate: {int(info['default_samplerate'])}")
+    print(f"Vosk rate: {sample_rate}")
     print(f"Listening for {seconds:.0f} seconds...")
-    print("Say:  hello Neo, this is a microphone test")
+    print("Say: hello Neo, this is a microphone test")
     print()
 
     audio_queue: queue.Queue[bytes] = queue.Queue(maxsize=50)
@@ -72,7 +73,7 @@ def microphone_test(model_path: Path, device_index: int = -1, seconds: float = 6
             if samples:
                 current_peak = max(abs(x) for x in samples)
                 peak = max(peak, current_peak)
-                bars = min(30, int(current_peak / 1100))
+                bars = min(30, int(current_peak / 700))
                 print("\rMic level: " + "█" * bars + " " * (30 - bars), end="", flush=True)
 
             recognizer.AcceptWaveform(data)
@@ -86,11 +87,66 @@ def microphone_test(model_path: Path, device_index: int = -1, seconds: float = 6
     else:
         print("Vosk heard: <nothing>")
 
-    if peak < 100:
-        print("\nWARNING: Almost no microphone signal reached Python.")
-        print("Check Windows microphone permission, selected input device, and microphone mute.")
+    if peak < 300:
+        print("\nWARNING: The microphone signal is very quiet.")
     elif not text:
-        print("\nThe microphone is working, but Vosk did not recognize speech.")
-        print("Try speaking closer to the microphone or selecting a different input device.")
+        print("\nThe microphone is receiving audio, but Vosk did not recognize speech.")
     else:
         print("\nMicrophone + Vosk are working.")
+
+
+def wake_test(model_path: Path, device_index: int = -1, seconds: float = 10.0) -> None:
+    if not model_path.exists():
+        raise FileNotFoundError(f"Vosk model not found: {model_path}")
+
+    SetLogLevel(-1)
+    model = Model(str(model_path))
+    device = None if device_index < 0 else device_index
+    sample_rate = 16000
+
+    print("\nNeo wake-word test")
+    print("Say only: Neo")
+    print(f"Listening for up to {seconds:.0f} seconds...\n")
+
+    audio_queue: queue.Queue[bytes] = queue.Queue(maxsize=50)
+
+    def callback(indata, frames, callback_time, status) -> None:
+        del frames, callback_time, status
+        try:
+            audio_queue.put_nowait(bytes(indata))
+        except queue.Full:
+            pass
+
+    recognizer = KaldiRecognizer(model, sample_rate, json.dumps(["neo"]))
+    started = time.monotonic()
+
+    with sd.RawInputStream(
+        samplerate=sample_rate,
+        blocksize=2000,
+        device=device,
+        dtype="int16",
+        channels=1,
+        callback=callback,
+    ):
+        while time.monotonic() - started < seconds:
+            try:
+                data = audio_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+
+            if recognizer.AcceptWaveform(data):
+                result = json.loads(recognizer.Result())
+                if "neo" in result.get("text", "").lower().split():
+                    print("WAKE WORD DETECTED: Neo")
+                    return
+
+            partial = json.loads(recognizer.PartialResult()).get("partial", "").lower()
+            if "neo" in partial.split():
+                print("WAKE WORD DETECTED: Neo")
+                return
+
+    final = json.loads(recognizer.FinalResult()).get("text", "").lower()
+    if "neo" in final.split():
+        print("WAKE WORD DETECTED: Neo")
+    else:
+        print("Wake word not detected.")
