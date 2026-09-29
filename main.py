@@ -2,8 +2,18 @@ from __future__ import annotations
 
 import argparse
 
-from neo.config import load_settings
-from neo.core.assistant import NeoAssistant
+# Windows checkouts can expose Git's "neo" package directory as "Neo".
+# Linux/macOS keep the lower-case package name. Support both layouts.
+try:
+    from neo.config import load_settings
+    from neo.core.assistant import NeoAssistant
+    PACKAGE_NAME = "neo"
+except ModuleNotFoundError as exc:
+    if exc.name != "neo.config":
+        raise
+    from Neo.config import load_settings
+    from Neo.core.assistant import NeoAssistant
+    PACKAGE_NAME = "Neo"
 
 
 def run_text_mode() -> None:
@@ -30,7 +40,10 @@ def run_text_mode() -> None:
 
 
 def run_voice_mode() -> None:
-    from neo.voice.assistant import VoiceAssistant
+    if PACKAGE_NAME == "neo":
+        from neo.voice.assistant import VoiceAssistant
+    else:
+        from Neo.voice.assistant import VoiceAssistant
 
     settings = load_settings()
     neo = NeoAssistant(settings)
