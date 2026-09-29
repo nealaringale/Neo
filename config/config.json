@@ -2,5 +2,8 @@
   "name": "Neo",
   "user_name": "Neal",
   "version": "0.1.0",
-  "safe_mode": true
+  "safe_mode": true,
+  "llm_enabled": false,
+  "ollama_url": "http://127.0.0.1:11434",
+  "ollama_model": "llama3.2"
 }
