@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from ..config import ROOT_DIR, Settings
@@ -11,51 +10,51 @@ from .wake_word import WakeWordDetector
 
 
 class VoiceAssistant:
-    """Wake-word voice loop: listen silently -> hear Neo -> listen -> respond."""
+    """Silent standby -> hear 'Neo' -> listen -> respond."""
 
     def __init__(self, settings: Settings, assistant: NeoAssistant) -> None:
         self.settings = settings
         self.assistant = assistant
+
         self.speaker = Speaker(
             voice_name=settings.tts_voice or None,
             rate=settings.tts_rate,
             volume=settings.tts_volume,
         )
 
-        keyword_path = Path(settings.wake_word_path)
-        if not keyword_path.is_absolute():
-            keyword_path = ROOT_DIR / keyword_path
-
         model_path = Path(settings.vosk_model_path)
         if not model_path.is_absolute():
             model_path = ROOT_DIR / model_path
 
         self.wake = WakeWordDetector(
-            keyword_path=keyword_path,
-            access_key=os.getenv("PICOVOICE_ACCESS_KEY"),
+            model_path=model_path,
             device_index=settings.audio_device_index,
-            sensitivity=settings.wake_sensitivity,
+            blocksize=settings.audio_blocksize,
         )
+
         self.listener = SpeechListener(
             model_path=model_path,
-            device_recorder=self.wake.recorder,
+            device_index=settings.audio_device_index,
             max_seconds=settings.command_max_seconds,
+            silence_seconds=settings.command_silence_seconds,
+            blocksize=settings.audio_blocksize,
         )
 
     def run(self) -> None:
-        self.speaker.speak(
-            f"Neo voice mode is active. Say Neo when you need me, {self.settings.user_name}."
-        )
+        print("[Neo] Voice mode active. Waiting for 'Neo'.")
 
         try:
             while True:
-                print("\n[Neo] Listening for wake word...")
-                self.wake.wait()
+                print("[Neo] Standby...")
+
+                if not self.wake.wait():
+                    continue
 
                 self.speaker.speak("Yes, Neal?")
-                print("[Neo] Wake word detected. Listening for command...")
+                print("[Neo] Wake word detected. Listening...")
 
                 command = self.listener.listen()
+
                 if not command:
                     self.speaker.speak("I didn't catch that.")
                     continue
@@ -67,7 +66,6 @@ class VoiceAssistant:
 
                 if should_exit:
                     break
+
         except KeyboardInterrupt:
             print("\n[Neo] Voice mode stopped.")
-        finally:
-            self.wake.close()
