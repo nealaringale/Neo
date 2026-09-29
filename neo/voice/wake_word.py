@@ -9,18 +9,14 @@ import sounddevice as sd
 
 
 class WakeWordDetector:
-    """Offline wake-word detector using Vosk with a fixed 'neo' grammar.
-
-    The microphone is processed locally. Neo only becomes active when the
-    recognizer returns the word 'neo'. No cloud API or access key is needed.
-    """
+    """Offline wake-word detector using Vosk with an exact 'neo' grammar."""
 
     def __init__(
         self,
         model_path: Path,
         device_index: int = -1,
-        sample_rate: int | None = None,
-        blocksize: int = 4000,
+        sample_rate: int = 16000,
+        blocksize: int = 2000,
     ) -> None:
         try:
             from vosk import KaldiRecognizer, Model, SetLogLevel
@@ -31,47 +27,38 @@ class WakeWordDetector:
             ) from exc
 
         if not model_path.exists():
-            raise FileNotFoundError(
-                f"Vosk model not found: {model_path}\n"
-                "Download the Vosk Indian-English model and extract it there."
-            )
+            raise FileNotFoundError(f"Vosk model not found: {model_path}")
 
-        self._Model = Model
         self._KaldiRecognizer = KaldiRecognizer
         SetLogLevel(-1)
 
-        self.model = self._Model(str(model_path))
+        self.model = Model(str(model_path))
         self.device_index = None if device_index < 0 else device_index
-        self.sample_rate = sample_rate or int(
-            sd.query_devices(self.device_index, "input")["default_samplerate"]
-        )
+        self.sample_rate = sample_rate
         self.blocksize = blocksize
-        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=20)
+        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=30)
 
     def _callback(self, indata, frames, callback_time, status) -> None:
         del frames, callback_time
         if status:
-            # Do not print normal audio-device warnings repeatedly.
             pass
-
         try:
             self._queue.put_nowait(bytes(indata))
         except queue.Full:
-            # Drop stale audio rather than allowing the wake detector to lag.
             pass
 
     @staticmethod
     def _contains_wake_word(result: str) -> bool:
         try:
-            text = json.loads(result).get("text", "").strip().lower()
+            text = json.loads(result).get("partial", "").strip().lower()
+            if not text:
+                text = json.loads(result).get("text", "").strip().lower()
         except json.JSONDecodeError:
             return False
 
-        words = text.split()
-        return "neo" in words
+        return "neo" in text.split()
 
     def wait(self, timeout: float | None = None) -> bool:
-        """Wait until 'neo' is heard. Returns False if timeout expires."""
         while not self._queue.empty():
             try:
                 self._queue.get_nowait()
