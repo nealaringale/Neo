@@ -34,6 +34,14 @@ def _run_command(command: list[str]) -> str:
 
 def open_application(app_name: str) -> str:
     key = app_name.strip().lower()
+
+    if key in {"browser", "default browser", "web browser"}:
+        try:
+            webbrowser.open("about:blank")
+        except Exception as exc:
+            return f"Could not open the browser: {exc}"
+        return "Opened the default browser."
+
     command = APP_ALIASES.get(key)
     if command is None:
         return (
