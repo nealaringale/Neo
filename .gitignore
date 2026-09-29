@@ -10,3 +10,7 @@ env/
 Thumbs.db
 data/memory.json
 logs/
+
+# Local voice models and wake-word assets
+models/*.ppn
+models/vosk-model-*/
