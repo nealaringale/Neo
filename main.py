@@ -71,11 +71,11 @@ def run_microphone_test() -> None:
 
 def list_microphones() -> None:
     if PACKAGE_NAME == "neo":
-        from neo.voice.diagnostics import list_microphones
+        from neo.voice.diagnostics import list_microphones as show_microphones
     else:
-        from Neo.voice.diagnostics import list_microphones
+        from Neo.voice.diagnostics import list_microphones as show_microphones
 
-    list_microphones()
+    show_microphones()
 
 
 def main() -> None:
