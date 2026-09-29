@@ -69,6 +69,24 @@ def run_microphone_test() -> None:
     )
 
 
+def run_wake_test() -> None:
+    if PACKAGE_NAME == "neo":
+        from neo.voice.diagnostics import wake_test
+    else:
+        from Neo.voice.diagnostics import wake_test
+
+    settings = load_settings()
+    model_path = Path(settings.vosk_model_path)
+    if not model_path.is_absolute():
+        model_path = ROOT_DIR / model_path
+
+    wake_test(
+        model_path=model_path,
+        device_index=settings.audio_device_index,
+        seconds=10.0,
+    )
+
+
 def list_microphones() -> None:
     if PACKAGE_NAME == "neo":
         from neo.voice.diagnostics import list_microphones as show_microphones
@@ -83,6 +101,7 @@ def main() -> None:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--voice", action="store_true", help="start wake-word voice mode")
     group.add_argument("--mic-test", action="store_true", help="test microphone and Vosk")
+    group.add_argument("--wake-test", action="store_true", help="test detection of the word Neo")
     group.add_argument("--list-mics", action="store_true", help="list available microphones")
     args = parser.parse_args()
 
@@ -90,6 +109,8 @@ def main() -> None:
         run_voice_mode()
     elif args.mic_test:
         run_microphone_test()
+    elif args.wake_test:
+        run_wake_test()
     elif args.list_mics:
         list_microphones()
     else:
